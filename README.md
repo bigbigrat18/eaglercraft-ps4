@@ -68,6 +68,19 @@ under plain GNU Make (`**` isn't a `wildcard` feature) -- the asset was
 being left out of the pkg entirely. Fixed here with `$(shell find assets
 -type f)`.
 
+**Update after a real hardware test:** the first built pkg installed but
+failed to launch with PS4's generic "the data for the application is
+corrupted" dialog -- before any of this project's own code ran. Root
+cause: `sce_module/` was empty. The toolchain's *git source* only ships
+`.gitkeep` placeholders there (no binaries belong in git), so building
+from a plain `git clone` never surfaces this -- but the real release
+package shows every single one of the toolchain's samples, no exceptions,
+bundles `sce_module/libc.prx` and `sce_module/libSceFios2.prx` alongside
+the eboot. A homebrew ELF linked against the toolchain's libc stub needs
+that matching `.prx` bundled in the pkg itself, or the loader's version
+check fails and the system reports it as generic data corruption. Fixed
+by bundling both files; this repo now carries them.
+
 What's still *not* verified is anything that only matters once the pkg is
 actually running as the signed PS4 process it's not being run as here --
 i.e. whether the `OrbisWebBrowserDialogParam` struct this project invented
