@@ -1,0 +1,12 @@
+# Build intermediates / outputs (OpenOrbis toolchain conventions)
+x64/
+*.o
+*.elf
+*.oelf
+eboot.bin
+*.pkg
+pkg.gp4
+sce_sys/param.sfo
+
+# OS noise
+.DS_Store
