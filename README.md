@@ -201,6 +201,33 @@ nothing else to route. `main.cpp` now points the dialog at
 (it now takes a complete URL rather than building a `file://` one
 itself).
 
+**Eighth update -- it loaded, but no WebGL.** The HTTP workaround
+worked: the page actually loaded and ran its JavaScript this time,
+getting far enough to hit eaglercraft's own feature-detection check,
+which showed its in-page error *"This device is not compatible with
+eaglercraft :( Issue: WebGL is not supported on this device!"* This is
+real, substantial progress -- content serving, JS execution, and canvas
+access are all confirmed working through this dialog.
+
+Whether this is fixable from our side is genuinely unclear. Sony's own
+PS4 WebKit can do WebGL -- a 2013 Khronos/Sony statement confirms the
+PlayStation Store, Music, and Video apps are themselves built with
+WebGL inside the system browser -- so the engine isn't fundamentally
+incapable. But nothing publicly documented (SharpProspero, AnyPS5, or
+general search) confirms whether the sandboxed, third-party-facing
+`WebBrowserDialog` wrapper specifically exposes that same capability, or
+deliberately restricts it (plausible: it's meant to overlay a running
+game without competing for GPU resources, unlike a first-party system
+app that owns the whole screen).
+
+Tried one experiment: switched from `Default` to `Custom` presentation
+mode with full-screen dimensions and every `Parts`/`Control` bit set, on
+the chance the window/compositing setup affects WebGL context creation.
+This is a genuine guess, not a confirmed fix -- SharpProspero describes
+those fields as UI chrome layout only (size, position, which
+buttons/parts show), nothing GPU-related. If it doesn't help, `Default`
+mode is almost certainly fine to go back to for future iteration.
+
 Whatever shows up after installing this version is the single most
 useful piece of information to report back.
 

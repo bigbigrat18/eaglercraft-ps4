@@ -54,9 +54,24 @@ int32_t WebBrowserDialog::OpenUrl(const char* url)
 		ORBIS_COMMON_DIALOG_MAGIC_NUMBER + reinterpret_cast<uint64_t>(&param));
 
 	param.size = sizeof(param);
-	param.mode = ORBIS_WEB_BROWSER_DIALOG_MODE_DEFAULT;
+	// EXPERIMENT, not a confirmed fix: switched Default -> Custom mode
+	// with full-screen dimensions and every Parts/Control bit set, on the
+	// chance it affects how the dialog's surface/compositing is set up
+	// and that happens to unlock WebGL. None of these fields are
+	// documented as GPU/WebGL related (SharpProspero describes them as
+	// window chrome layout only: size, position, which UI parts/buttons
+	// show), so this is genuinely a guess -- if it doesn't help, Default
+	// mode is almost certainly fine to go back to.
+	param.mode = ORBIS_WEB_BROWSER_DIALOG_MODE_CUSTOM;
 	param.userId = userId;
 	param.url = url;
+	param.width = 1920;
+	param.height = 1080;
+	param.positionX = 0;
+	param.positionY = 0;
+	param.parts = 0xFFFFFFFF;
+	param.control = 0xFFFFFFFF;
+	param.animation = 0;
 
 	int32_t rc = sceWebBrowserDialogOpen(&param);
 	if(rc < 0)
