@@ -24,7 +24,7 @@ CONTENT_ID  := IV0000-BREW00200_00-EAGLERCRAFTPS400
 # used to show exact error codes on screen for debugging -- far more
 # reliable than a hardware tester trying to decode color bars from a
 # photo, which is what this replaced.
-LIBS        := -lc -lkernel -lc++ -lSceSysmodule -lSceCommonDialog -lSceWebBrowserDialog -lSceVideoOut -lSceFreeType
+LIBS        := -lc -lkernel -lc++ -lSceSysmodule -lSceCommonDialog -lSceWebBrowserDialog -lSceVideoOut -lSceFreeType -lSceUserService
 
 # Additional compile flags. GRAPHICS_USES_FONT enables Scene2D's
 # FreeType-backed DrawText (see samples/keyboard's own Makefile for the
