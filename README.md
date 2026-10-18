@@ -112,6 +112,22 @@ diagnostic signal:
 | Green | Open succeeded -- if the screen is green but no browser content shows, the dialog opened but isn't rendering/loading, which points at the `OrbisWebBrowserDialogParam` struct guess specifically |
 | Still black | The video-out surface itself isn't being presented at all -- a more fundamental issue than anything above |
 
+**Third update:** on real hardware this version showed magenta --
+`sceWebBrowserDialogOpen()` itself was failing. That specific, confirmed
+signal (video-out, module load, and dialog init all working; only Open()
+rejecting the param) pointed straight back at the guessed
+`OrbisWebBrowserDialogParam` struct. Found a concrete lead: the AnyPS5
+PS4/PS5 emulator project's test harness for `sceWebBrowserDialogOpen`
+(`GuestWebBrowserDialog.cpp`) uses a plain **64-byte** buffer and confirms
+the function null-checks its pointer -- without revealing field names,
+but 48 (`baseParam`) + 8 (`size`) + 8 (one pointer) == 64 exactly, and the
+original guess (with an extra `userId` + `reserved[40]`, ~112 bytes) was
+nearly double that. Dropped the extra fields to match: `baseParam` + `size`
++ a single `url` pointer, with a `static_assert(sizeof(...) == 64)` so this
+can't silently drift again. Still not confirmed field-by-field, but
+meaningfully better-grounded than the first guess -- next hardware test
+will tell us if Open() actually succeeds now.
+
 Whatever color shows up after installing this version is the single most
 useful piece of information to report back.
 
