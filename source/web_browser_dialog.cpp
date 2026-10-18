@@ -1,11 +1,12 @@
 #include <string>
 #include <cstring>
 #include <orbis/Sysmodule.h>
+#include <orbis/UserService.h>
 #include "web_browser_dialog.h"
 #include "log.h"
 
 WebBrowserDialog::WebBrowserDialog()
-	: isOpen(false)
+	: isOpen(false), userId(-1)
 {
 }
 
@@ -29,6 +30,15 @@ WebBrowserDialogInitResult WebBrowserDialog::Init()
 		return WebBrowserDialogInitResult::WEBBROWSER_INIT_FAILED;
 	}
 
+	// WebBrowserDialogParam has a real userId field (SharpProspero-confirmed,
+	// see web_browser_dialog.h) -- pass the actual active user rather than
+	// leaving it 0/uninitialized. Same sceUserServiceInitialize +
+	// sceUserServiceGetInitialUser pattern as the OpenOrbis keyboard sample.
+	OrbisUserServiceInitializeParams userParams;
+	userParams.priority = ORBIS_KERNEL_PRIO_FIFO_LOWEST;
+	sceUserServiceInitialize(&userParams);
+	sceUserServiceGetInitialUser(&userId);
+
 	return WebBrowserDialogInitResult::OK;
 }
 
@@ -47,6 +57,8 @@ int32_t WebBrowserDialog::OpenLocalFile(const char* app0RelativePath)
 		ORBIS_COMMON_DIALOG_MAGIC_NUMBER + reinterpret_cast<uint64_t>(&param));
 
 	param.size = sizeof(param);
+	param.mode = ORBIS_WEB_BROWSER_DIALOG_MODE_DEFAULT;
+	param.userId = userId;
 	param.url = url.c_str();
 
 	int32_t rc = sceWebBrowserDialogOpen(&param);

@@ -18,32 +18,30 @@
 // CONFIDENCE NOTE:
 // - sceCommonDialogInitialize/IsUsed, OrbisCommonDialogBaseParam's layout
 //   (size / reserved[36] / magic), the magic-number formula, and the
-//   status enum are REAL, confirmed definitions from the toolchain's own
-//   headers, exercised by the toolchain's real, working MsgDialog sample.
-// - sceWebBrowserDialog*'s exact *symbol names* (Initialize, Open, Close,
-//   UpdateStatus, GetStatus, GetResult, Navigate, SetZoom, GetEvent,
-//   Terminate, ResetCookie, SetCookie, OpenForPredeterminedContent) are
-//   REAL, confirmed via `nm -D lib/libSceWebBrowserDialog.so` against the
-//   actual shipped library.
-// - The *argument types* for those symbols are NOT yet reverse-engineered
-//   anywhere in OpenOrbis -- WebBrowserDialog.h only ships bare,
-//   argument-less NID stubs (`void sceWebBrowserDialogOpen();`).
-//   OrbisWebBrowserDialogParam below was originally modeled on
-//   OrbisMsgDialogParam's shape (baseParam + size + userId + reserved[]),
-//   which built but failed at runtime: sceWebBrowserDialogOpen() returned
-//   an error (confirmed via the screen-color diagnostics in main.cpp --
-//   see README "Status colors"). That first guess was also ~112 bytes,
-//   which turned out to be the clue: the AnyPS5 PS4/PS5 emulator
-//   project's test harness for sceWebBrowserDialogOpen
-//   (GuestWebBrowserDialog.cpp, github.com/boykopovar/AnyPS5) uses a
-//   plain 64-byte buffer and confirms the function null-checks its
-//   pointer arg (COMMON_DIALOG_ERROR_ARG_NULL on nullptr), without
-//   revealing field names. 48 (baseParam) + 8 (size) + 8 (one pointer)
-//   == 64 exactly, so the struct below drops the userId/reserved[] this
-//   dialog apparently doesn't have and keeps just baseParam + size + a
-//   single url pointer. Better-grounded than the first guess, but still
-//   not confirmed field-by-field -- if Open() still fails, this is the
-//   next thing to revisit.
+//   status enum are REAL, confirmed definitions from the OpenOrbis
+//   toolchain's own headers, exercised by the toolchain's real, working
+//   MsgDialog sample.
+// - sceWebBrowserDialog*'s exact *symbol names* are REAL, confirmed via
+//   `nm -D lib/libSceWebBrowserDialog.so` against the actual shipped
+//   library.
+// - OrbisWebBrowserDialogParam below is now taken directly from
+//   SvenGDK/SharpProspero (github.com/SvenGDK/SharpProspero), a
+//   PS4/PS5 interop SDK project whose WebBrowserDialog.cs documents this
+//   struct field-by-field with explicit byte offsets. This replaces two
+//   earlier guesses: a ~112-byte struct modeled on OrbisMsgDialogParam,
+//   then a 64-byte struct inferred from an emulator project's test
+//   buffer size that turned out to carry no real evidentiary weight
+//   (that emulator's sceWebBrowserDialogOpen() treats its param as a
+//   fully opaque, never-dereferenced pointer -- the 64-byte buffer in
+//   its test was an arbitrary convenient size, not a confirmed struct
+//   size). Both earlier guesses produced a real, confirmed
+//   SCE_COMMON_DIALOG_ERROR_PARAM_INVALID (0x80B8000A) on hardware. The
+//   real struct is 328 bytes and -- critically -- has a `mode` field
+//   that SharpProspero's own docs say the service rejects if left at its
+//   zero/Invalid value, which is exactly what both earlier guesses did
+//   (they never set it, since neither guess even had the field). Still
+//   not hardware-confirmed as of this comment, but this is a real,
+//   offset-documented community source rather than another guess.
 
 #include <orbis/CommonDialog.h>
 #include <orbis/_types/common_dialog.h>
@@ -51,18 +49,47 @@
 #include <stddef.h>
 
 extern "C" {
-	// Best-effort reconstruction -- see confidence note above. Exactly 64
-	// bytes: 48 (baseParam) + 8 (size) + 8 (url).
+	enum OrbisWebBrowserDialogMode
+	{
+		ORBIS_WEB_BROWSER_DIALOG_MODE_INVALID = 0, // rejected by the service -- must not be left as this
+		ORBIS_WEB_BROWSER_DIALOG_MODE_DEFAULT = 1, // full standard presentation
+		ORBIS_WEB_BROWSER_DIALOG_MODE_CUSTOM  = 2, // caller-sized/positioned window (width/height/parts fields apply)
+	};
+
+	// Matches SvenGDK/SharpProspero's WebBrowserDialogParam exactly,
+	// field-for-field and offset-for-offset (see confidence note above).
+	// Only mode/userId/url are populated for a Default-mode open; the
+	// Custom-mode-only fields (width/height/position/parts/control) are
+	// left zeroed, as are the optional callback/IME/WebView param
+	// pointers.
 	typedef struct OrbisWebBrowserDialogParam
 	{
-		OrbisCommonDialogBaseParam baseParam;
-		size_t size;
-		const char* url;
-	} OrbisWebBrowserDialogParam;
+		OrbisCommonDialogBaseParam baseParam; // offset 0, 48 bytes
+		size_t size;                          // offset 48
+		int32_t mode;                         // offset 56 -- OrbisWebBrowserDialogMode
+		int32_t userId;                       // offset 60
+		const char* url;                      // offset 64
+		void* callbackInitParam;              // offset 72 -- optional
+		uint16_t width;                       // offset 80 -- Custom mode only
+		uint16_t height;                      // offset 82 -- Custom mode only
+		uint16_t positionX;                   // offset 84 -- Custom mode only
+		uint16_t positionY;                   // offset 86 -- Custom mode only
+		uint32_t parts;                       // offset 88 -- Custom mode only
+		uint16_t headerWidth;                 // offset 92 -- Custom mode only
+		uint16_t headerPositionX;             // offset 94 -- Custom mode only
+		uint16_t headerPositionY;             // offset 96 -- Custom mode only
+		uint16_t _padding0;                   // offset 98
+		uint32_t control;                     // offset 100 -- Custom mode only
+		void* imeParam;                       // offset 104 -- optional
+		void* webViewParam;                   // offset 112 -- optional
+		uint32_t animation;                   // offset 120
+		uint8_t reserved[202];                // offset 124
+		uint16_t _tailPadding;                // offset 326
+	} OrbisWebBrowserDialogParam;             // total: 328 bytes
 
-	static_assert(sizeof(OrbisWebBrowserDialogParam) == 64,
-		"OrbisWebBrowserDialogParam must stay 64 bytes to match the size "
-		"confirmed in AnyPS5's sceWebBrowserDialogOpen test harness");
+	static_assert(sizeof(OrbisWebBrowserDialogParam) == 328,
+		"OrbisWebBrowserDialogParam must stay 328 bytes to match "
+		"SharpProspero's documented WebBrowserDialogParam layout");
 
 	typedef struct OrbisWebBrowserDialogResult
 	{
@@ -93,6 +120,7 @@ enum class WebBrowserDialogInitResult
 class WebBrowserDialog
 {
 	bool isOpen;
+	int32_t userId;
 public:
 	WebBrowserDialog();
 
@@ -112,7 +140,7 @@ public:
 	// Returns the raw sceWebBrowserDialogOpen() return code (>= 0 on
 	// success, a negative SCE error code on failure) rather than a plain
 	// bool -- with no debug console available for testing, the caller
-	// displays this value directly (see main.cpp's hex-bar diagnostic)
+	// displays this value directly (see main.cpp's on-screen error text)
 	// since it's the only way to see what Sony's API is actually
 	// rejecting.
 	int32_t OpenLocalFile(const char* app0RelativePath);

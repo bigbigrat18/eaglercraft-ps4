@@ -149,6 +149,35 @@ print the literal return code on an Open() failure, e.g.
 `sceWebBrowserDialogOpen failed: rc=0x8010000A (-2146435062)`. A photo of
 that text is unambiguous to read, unlike the color bars.
 
+**Sixth update -- real decoded error, and a real struct source found.**
+The on-screen text read `rc=0x90B8000A (-2135425014)`. Decimal is
+authoritative over hex read off a photo (easy to misread "8" as "9" at a
+glance), and `-2135425014` as a signed 32-bit int is exactly
+`0x80B8000A` = **`SCE_COMMON_DIALOG_ERROR_PARAM_INVALID`**
+(`CE-33411-2`, "It is an invalid parameter" -- looked up against a public
+PS4 error-code database, [BenjaminFaal/ps4-error-codes](https://github.com/BenjaminFaal/ps4-error-codes),
+whose data traces back to [psdevwiki](https://www.psdevwiki.com/ps4/Error_Codes)).
+Confirms this was never a crash/busy/uninitialized issue -- Sony's own
+validation was explicitly rejecting the param contents, both times.
+
+That sent the search for the real struct in a different direction:
+tracked a citation in the [AnyPS5](https://github.com/boykopovar/AnyPS5)
+PS4/PS5 emulator's own dev notes (`docs/dev/debt/libSceWebBrowserDialog.md`,
+which admits its own `sceWebBrowserDialogOpen` is a "silent stub" that
+never actually reads its param beyond a null check -- the 64-byte test
+buffer that drove the previous fix carried no real evidentiary weight
+after all) to [SvenGDK/SharpProspero](https://github.com/SvenGDK/SharpProspero),
+a PS4/PS5 interop SDK whose `WebBrowserDialog.cs` documents
+`WebBrowserDialogParam` **field-by-field with explicit byte offsets** --
+a real community source, not another guess. The struct is **328 bytes**,
+and critically has a `mode` field at offset 56 that its own docs say:
+*"the service rejects a block left this way"* if left at its zero
+(`Invalid`) value -- exactly what both earlier guesses did, since neither
+guess even had that field. `source/web_browser_dialog.h` now matches
+SharpProspero's layout exactly (`mode = Default`, a real `userId` from
+`sceUserServiceGetInitialUser` instead of leaving it 0, `url`, `size =
+328`), with a `static_assert(sizeof(...) == 328)`.
+
 Whatever shows up after installing this version is the single most
 useful piece of information to report back.
 
@@ -166,7 +195,7 @@ Confidence, component by component:
 | `ORBIS_SYSMODULE_WEB_BROWSER_DIALOG = 0x00AB`, loading via `sceSysmoduleLoadModule` | **Confirmed** | Found explicitly in the toolchain's own `_types/sysmodule.h`, comment included (`// libSceWebBrowserDialog.sprx`). |
 | `sceWebBrowserDialog*` symbol names (Open, Close, UpdateStatus, GetStatus, GetResult, Navigate, SetZoom, GetEvent, Initialize, Terminate, ResetCookie, SetCookie, OpenForPredeterminedContent) | **Confirmed** | Read directly off the real shipped `lib/libSceWebBrowserDialog.so` with `nm -D`. |
 | `OrbisCommonDialogBaseParam` layout (`size`/`reserved[36]`/`magic`) and the magic-number formula | **Confirmed** | Real struct from the toolchain's own headers, exercised by its working `MsgDialog` sample, which was built and run through the same process here (header-only, not hardware-testable, but the struct itself is Sony's real one, not a guess). |
-| `OrbisWebBrowserDialogParam`'s extra fields (`url`, `userId`) and offsets | **Best-effort guess** | WebBrowserDialog hasn't been reverse-engineered down to argument types anywhere in OpenOrbis yet. This struct follows the exact same shape every *other*, fully-reversed Common Dialog in this toolchain uses (`OrbisMsgDialogParam` as the template) -- a well-grounded guess, not one invented from nothing, but still the single most likely thing to need correcting on real hardware. |
+| `OrbisWebBrowserDialogParam`'s fields and offsets | **Sourced, not guessed -- not yet hardware-confirmed** | See "Sixth update" below: taken field-by-field from [SvenGDK/SharpProspero](https://github.com/SvenGDK/SharpProspero)'s offset-documented `WebBrowserDialog.cs`, after two earlier self-invented guesses both produced a real, confirmed `SCE_COMMON_DIALOG_ERROR_PARAM_INVALID` on hardware. |
 | Whether `file://` URLs are even permitted by this dialog, vs. needing `sceWebBrowserDialogOpenForPredeterminedContent` or a cert-whitelisted scheme | **Unverified** | Can't tell from headers alone; if `Open()` succeeds but the page never loads, this is the next thing to check. |
 
 If `sceWebBrowserDialogOpen()` returns an error or the dialog opens but
