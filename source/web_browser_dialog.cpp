@@ -32,7 +32,7 @@ WebBrowserDialogInitResult WebBrowserDialog::Init()
 	return WebBrowserDialogInitResult::OK;
 }
 
-bool WebBrowserDialog::OpenLocalFile(const char* app0RelativePath)
+int32_t WebBrowserDialog::OpenLocalFile(const char* app0RelativePath)
 {
 	std::string url = std::string("file://") + app0RelativePath;
 
@@ -49,14 +49,15 @@ bool WebBrowserDialog::OpenLocalFile(const char* app0RelativePath)
 	param.size = sizeof(param);
 	param.url = url.c_str();
 
-	if(sceWebBrowserDialogOpen(&param) < 0)
+	int32_t rc = sceWebBrowserDialogOpen(&param);
+	if(rc < 0)
 	{
-		DEBUGLOG << "[DEBUG] [ERROR] sceWebBrowserDialogOpen failed";
-		return false;
+		DEBUGLOG << "[DEBUG] [ERROR] sceWebBrowserDialogOpen failed, rc=0x" << std::hex << rc;
+		return rc;
 	}
 
 	isOpen = true;
-	return true;
+	return rc;
 }
 
 bool WebBrowserDialog::Pump()

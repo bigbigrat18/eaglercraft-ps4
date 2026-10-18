@@ -128,7 +128,38 @@ can't silently drift again. Still not confirmed field-by-field, but
 meaningfully better-grounded than the first guess -- next hardware test
 will tell us if Open() actually succeeds now.
 
-Whatever color shows up after installing this version is the single most
+**Fourth update:** the 64-byte struct size fix did *not* resolve it --
+still pink/magenta on hardware, meaning `sceWebBrowserDialogOpen()` is
+still failing even with the right-sized param. Size alone wasn't enough;
+something about the field layout or content is still wrong, and guessing
+a third time without more data isn't productive. So instead of guessing
+again, this version makes the app show the *actual* return code.
+
+On an Open() failure, the screen now shows **8 colored vertical bars**
+instead of a flat color, encoding the raw `int32_t` return value as 8 hex
+nibbles (most significant first, left to right) using this palette:
+
+### Reading the hex-code bars
+
+| Color | Digit | Color | Digit |
+|---|---|---|---|
+| Black | 0 | Brown | A |
+| White | 1 | Gray | B |
+| Red | 2 | Maroon | C |
+| Green | 3 | Navy | D |
+| Blue | 4 | Olive | E |
+| Yellow | 5 | Teal | F |
+| Cyan | 6 | | |
+| Magenta | 7 | | |
+| Orange | 8 | | |
+| Purple | 9 | | |
+
+SCE error codes are conventionally shown as `0x8XXXXXXX`, so expect the
+leftmost bar to likely be orange (`8`). A photo of the screen is far more
+reliable to decode than describing each bar from memory -- if you can
+send one, that's the fastest path to actually reading the code.
+
+Whatever shows up after installing this version is the single most
 useful piece of information to report back.
 
 What's still *not* verified is anything that only matters once the pkg is

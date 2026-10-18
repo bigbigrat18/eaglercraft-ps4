@@ -108,7 +108,14 @@ public:
 	// keyboard input while the dialog is open/focused is handled by the
 	// system itself (PS4 natively supports USB keyboards for its own
 	// browser/text-entry UI) -- no manual input forwarding needed.
-	bool OpenLocalFile(const char* app0RelativePath);
+	//
+	// Returns the raw sceWebBrowserDialogOpen() return code (>= 0 on
+	// success, a negative SCE error code on failure) rather than a plain
+	// bool -- with no debug console available for testing, the caller
+	// displays this value directly (see main.cpp's hex-bar diagnostic)
+	// since it's the only way to see what Sony's API is actually
+	// rejecting.
+	int32_t OpenLocalFile(const char* app0RelativePath);
 
 	// Call once per frame. Returns false if the dialog isn't currently
 	// open (e.g. the user dismissed it) -- the caller should decide
