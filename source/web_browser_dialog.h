@@ -131,11 +131,19 @@ public:
 	// different screen color per case.
 	WebBrowserDialogInitResult Init();
 
-	// Opens the dialog pointed at a file:// URL built from a local
-	// pkg-relative path, e.g. "/app0/assets/eaglercraft.html". Real
-	// keyboard input while the dialog is open/focused is handled by the
-	// system itself (PS4 natively supports USB keyboards for its own
-	// browser/text-entry UI) -- no manual input forwarding needed.
+	// Opens the dialog pointed at the given URL. Real keyboard input while
+	// the dialog is open/focused is handled by the system itself (PS4
+	// natively supports USB keyboards for its own browser/text-entry UI)
+	// -- no manual input forwarding needed.
+	//
+	// NOTE: a file:// URL built from a local pkg-relative path (the
+	// original approach) opens the dialog successfully but then shows
+	// "this data is not supported by the PS4" -- a content-level
+	// rejection, not an Open() failure. SharpProspero's own docs only
+	// ever show this dialog used with http(s):// addresses, never
+	// file://, which matches that symptom. See LocalHttpServer and
+	// main.cpp for the http://127.0.0.1 workaround this project uses
+	// instead.
 	//
 	// Returns the raw sceWebBrowserDialogOpen() return code (>= 0 on
 	// success, a negative SCE error code on failure) rather than a plain
@@ -143,7 +151,7 @@ public:
 	// displays this value directly (see main.cpp's on-screen error text)
 	// since it's the only way to see what Sony's API is actually
 	// rejecting.
-	int32_t OpenLocalFile(const char* app0RelativePath);
+	int32_t OpenUrl(const char* url);
 
 	// Call once per frame. Returns false if the dialog isn't currently
 	// open (e.g. the user dismissed it) -- the caller should decide

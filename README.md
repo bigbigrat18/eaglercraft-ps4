@@ -104,12 +104,13 @@ diagnostic signal:
 
 | Color | Meaning |
 |---|---|
-| Gray | Booted, video-out working, about to try WebBrowserDialog |
+| Gray | Booted, video-out working, about to start the local HTTP server |
 | Yellow | `Scene2D::Init` itself failed (shouldn't be reachable if you see any color at all) |
+| Blue | `LocalHttpServer::Start` failed (asset file read, socket, bind, or listen) |
 | Red | `sceSysmoduleLoadModule(ORBIS_SYSMODULE_WEB_BROWSER_DIALOG)` failed |
 | Orange | `sceCommonDialogInitialize`/`sceWebBrowserDialogInitialize` failed |
 | Magenta | `sceWebBrowserDialogOpen` failed |
-| Green | Open succeeded -- if the screen is green but no browser content shows, the dialog opened but isn't rendering/loading, which points at the `OrbisWebBrowserDialogParam` struct guess specifically |
+| Green | Open succeeded -- if the screen is green but no browser content shows, the dialog opened but isn't rendering/loading |
 | Still black | The video-out surface itself isn't being presented at all -- a more fundamental issue than anything above |
 
 **Third update:** on real hardware this version showed magenta --
@@ -178,6 +179,28 @@ SharpProspero's layout exactly (`mode = Default`, a real `userId` from
 `sceUserServiceGetInitialUser` instead of leaving it 0, `url`, `size =
 328`), with a `static_assert(sizeof(...) == 328)`.
 
+**Seventh update -- Open() succeeds; file:// content is rejected.** The
+struct fix worked: the dialog actually opened and rendered its own
+overlay (no more `PARAM_INVALID`), but then showed *"this data is not
+supported by the PS4"* -- a content-level rejection, not an API error.
+SharpProspero's own `docs/dialogs.md` only ever shows this dialog opened
+against `https://` addresses (`WebBrowser.Open("https://example.com")`),
+never `file://`, which lines up with that symptom: this dialog looks
+built for remote web content, not local files.
+
+Workaround: `source/local_http_server.h/.cpp` is a tiny loopback-only
+HTTP server (plain POSIX `socket`/`bind`/`listen`/`accept`, verified
+against the toolchain's own `samples/networking`, running in a
+`std::thread`, verified against `samples/threading` -- no extra libs
+needed for either). It reads the bundled `eaglercraft.html` into memory
+once at startup and serves that same content to every request on
+`127.0.0.1:9080`, since the asset is one single self-contained page with
+nothing else to route. `main.cpp` now points the dialog at
+`http://127.0.0.1:9080/` instead of a `file://` path.
+`WebBrowserDialog::OpenLocalFile()` was renamed to `OpenUrl()` to match
+(it now takes a complete URL rather than building a `file://` one
+itself).
+
 Whatever shows up after installing this version is the single most
 useful piece of information to report back.
 
@@ -228,8 +251,9 @@ in case your setup is similarly unusual.)
 eaglercraft-ps4/
 ├── Makefile                      # OpenOrbis build + pkg packaging
 ├── source/
-│   ├── main.cpp                   # entry point, dialog open/pump loop
-│   └── web_browser_dialog.h/.cpp  # WebBrowserDialog wrapper -- see confidence table above
+│   ├── main.cpp                   # entry point, http server + dialog open/pump loop
+│   ├── web_browser_dialog.h/.cpp  # WebBrowserDialog wrapper -- see confidence table above
+│   └── local_http_server.h/.cpp   # loopback HTTP server -- see "Seventh update" above
 ├── assets/
 │   ├── eaglercraft.html           # bundled, self-contained EaglercraftX 1.8 client (JS build)
 │   └── fonts/font.ttf             # debug-text font (from OpenOrbis sample assets)

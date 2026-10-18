@@ -1,4 +1,3 @@
-#include <string>
 #include <cstring>
 #include <orbis/Sysmodule.h>
 #include <orbis/UserService.h>
@@ -42,10 +41,8 @@ WebBrowserDialogInitResult WebBrowserDialog::Init()
 	return WebBrowserDialogInitResult::OK;
 }
 
-int32_t WebBrowserDialog::OpenLocalFile(const char* app0RelativePath)
+int32_t WebBrowserDialog::OpenUrl(const char* url)
 {
-	std::string url = std::string("file://") + app0RelativePath;
-
 	OrbisWebBrowserDialogParam param;
 	std::memset(&param, 0, sizeof(param));
 
@@ -59,7 +56,7 @@ int32_t WebBrowserDialog::OpenLocalFile(const char* app0RelativePath)
 	param.size = sizeof(param);
 	param.mode = ORBIS_WEB_BROWSER_DIALOG_MODE_DEFAULT;
 	param.userId = userId;
-	param.url = url.c_str();
+	param.url = url;
 
 	int32_t rc = sceWebBrowserDialogOpen(&param);
 	if(rc < 0)

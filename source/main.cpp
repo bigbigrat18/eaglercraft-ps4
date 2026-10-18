@@ -1,11 +1,15 @@
 // eaglercraft-ps4 -- kiosk-mode homebrew wrapper around EaglercraftX 1.8
 //
 // Opens the PS4's Common Dialog WebBrowserDialog pointed at a bundled,
-// fully self-contained eaglercraft.html. Input is a physical USB keyboard
-// only (no gamepad translation) -- the system itself handles keyboard
-// input to the dialog while it's open/focused, so there's no manual event
-// forwarding here. See source/web_browser_dialog.h for the confidence
-// notes on this module's API surface.
+// fully self-contained eaglercraft.html -- served over a loopback HTTP
+// server (see local_http_server.h) rather than a file:// URL, which this
+// dialog turned out to reject with a content-level "not supported"
+// error even once Open() itself started succeeding. Input is a physical
+// USB keyboard only (no gamepad translation) -- the system itself
+// handles keyboard input to the dialog while it's open/focused, so
+// there's no manual event forwarding here. See
+// source/web_browser_dialog.h for the confidence notes on this module's
+// API surface.
 //
 // This app also owns a minimal Scene2D video-out surface (see graphics.h,
 // a toolchain-provided helper), for two reasons:
@@ -27,6 +31,7 @@
 
 #include <graphics.h>
 #include "web_browser_dialog.h"
+#include "local_http_server.h"
 
 // log.h's DEBUGLOG macro expects this global to exist in the app (same
 // convention every OpenOrbis sample that uses log.h follows).
@@ -36,18 +41,19 @@ namespace
 {
 	const char* kAssetPath = "/app0/assets/eaglercraft.html";
 	const char* kFontPath = "/app0/assets/fonts/font.ttf";
+	constexpr uint16_t kHttpPort = 9080;
 
 	constexpr int SCREEN_WIDTH = 1920;
 	constexpr int SCREEN_HEIGHT = 1080;
 
 	// Status colors -- see README "Status colors" for what each one means.
 	const Color COLOR_BOOTING     = {64, 64, 64};
+	const Color COLOR_HTTP_FAIL   = {0, 100, 255};
 	const Color COLOR_MODULE_FAIL = {255, 0, 0};
 	const Color COLOR_INIT_FAIL   = {255, 140, 0};
 	const Color COLOR_OPEN_FAIL   = {200, 0, 200};
 	const Color COLOR_RUNNING     = {0, 200, 0};
 
-	const Color BLACK = {0, 0, 0};
 	const Color WHITE = {255, 255, 255};
 }
 
@@ -102,6 +108,19 @@ int main(void)
 
 	presentStatus();
 
+	LocalHttpServer httpServer;
+	if(!httpServer.Start(kAssetPath, kHttpPort))
+	{
+		std::cerr << "Fatal: LocalHttpServer failed to start." << std::endl;
+		statusColor = COLOR_HTTP_FAIL;
+		errorText = "LocalHttpServer::Start failed (file read, socket, bind, or listen)";
+		for(;;)
+			presentStatus();
+	}
+
+	char url[64];
+	std::snprintf(url, sizeof(url), "http://127.0.0.1:%u/", httpServer.Port());
+
 	WebBrowserDialog dialog;
 	WebBrowserDialogInitResult initResult = dialog.Init();
 	if(initResult != WebBrowserDialogInitResult::OK)
@@ -123,7 +142,7 @@ int main(void)
 			presentStatus();
 	}
 
-	int32_t openResult = dialog.OpenLocalFile(kAssetPath);
+	int32_t openResult = dialog.OpenUrl(url);
 	if(openResult < 0)
 	{
 		std::cerr << "Fatal: WebBrowserDialog open failed, rc=0x"
@@ -147,7 +166,7 @@ int main(void)
 		{
 			// The dialog is the entire "game" -- if it got dismissed,
 			// just reopen it rather than leaving a blank screen.
-			int32_t reopenResult = dialog.OpenLocalFile(kAssetPath);
+			int32_t reopenResult = dialog.OpenUrl(url);
 			if(reopenResult < 0)
 			{
 				std::cerr << "Fatal: failed to reopen WebBrowserDialog, rc=0x"
