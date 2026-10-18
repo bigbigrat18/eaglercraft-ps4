@@ -81,6 +81,40 @@ that matching `.prx` bundled in the pkg itself, or the loader's version
 check fails and the system reports it as generic data corruption. Fixed
 by bundling both files; this repo now carries them.
 
+**Second update:** after the `sce_module` fix, the pkg installed and
+launched, but showed a black screen. Two things were wrong at once:
+
+1. This app had zero video output of its own (removed along with
+   Piglet/EGL during the Common Dialog pivot). A Common Dialog overlays
+   on top of whatever the app is already presenting -- with nothing being
+   presented, there may be nothing for the compositor to show the dialog
+   over.
+2. There's no debug console available for testing this on real hardware,
+   so any early failure (module load, dialog init, dialog open) was
+   silently hanging in an infinite loop with only a `std::cerr` print
+   nobody could see -- indistinguishable from "frozen black screen."
+
+Fixed both: `main.cpp` now keeps a minimal `Scene2D` video-out surface
+open (from the toolchain's own `samples/_common/graphics.h` helper, the
+same one the `keyboard` sample uses -- no EGL/Piglet GL context needed,
+just a plain framebuffer) and uses its fill color as the only available
+diagnostic signal:
+
+### Status colors
+
+| Color | Meaning |
+|---|---|
+| Gray | Booted, video-out working, about to try WebBrowserDialog |
+| Yellow | `Scene2D::Init` itself failed (shouldn't be reachable if you see any color at all) |
+| Red | `sceSysmoduleLoadModule(ORBIS_SYSMODULE_WEB_BROWSER_DIALOG)` failed |
+| Orange | `sceCommonDialogInitialize`/`sceWebBrowserDialogInitialize` failed |
+| Magenta | `sceWebBrowserDialogOpen` failed |
+| Green | Open succeeded -- if the screen is green but no browser content shows, the dialog opened but isn't rendering/loading, which points at the `OrbisWebBrowserDialogParam` struct guess specifically |
+| Still black | The video-out surface itself isn't being presented at all -- a more fundamental issue than anything above |
+
+Whatever color shows up after installing this version is the single most
+useful piece of information to report back.
+
 What's still *not* verified is anything that only matters once the pkg is
 actually running as the signed PS4 process it's not being run as here --
 i.e. whether the `OrbisWebBrowserDialogParam` struct this project invented

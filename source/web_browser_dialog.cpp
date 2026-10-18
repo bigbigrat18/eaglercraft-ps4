@@ -9,27 +9,27 @@ WebBrowserDialog::WebBrowserDialog()
 {
 }
 
-bool WebBrowserDialog::Init()
+WebBrowserDialogInitResult WebBrowserDialog::Init()
 {
 	if(sceSysmoduleLoadModule(ORBIS_SYSMODULE_WEB_BROWSER_DIALOG) < 0)
 	{
 		DEBUGLOG << "[DEBUG] [ERROR] Failed to load ORBIS_SYSMODULE_WEB_BROWSER_DIALOG";
-		return false;
+		return WebBrowserDialogInitResult::MODULE_LOAD_FAILED;
 	}
 
 	if(sceCommonDialogInitialize() < 0)
 	{
 		DEBUGLOG << "[DEBUG] [ERROR] sceCommonDialogInitialize failed";
-		return false;
+		return WebBrowserDialogInitResult::COMMON_DIALOG_INIT_FAILED;
 	}
 
 	if(sceWebBrowserDialogInitialize() < 0)
 	{
 		DEBUGLOG << "[DEBUG] [ERROR] sceWebBrowserDialogInitialize failed";
-		return false;
+		return WebBrowserDialogInitResult::WEBBROWSER_INIT_FAILED;
 	}
 
-	return true;
+	return WebBrowserDialogInitResult::OK;
 }
 
 bool WebBrowserDialog::OpenLocalFile(const char* app0RelativePath)
