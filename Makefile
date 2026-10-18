@@ -16,14 +16,11 @@ VERSION     := 1.00
 TITLE_ID    := BREW00200
 CONTENT_ID  := IV0000-BREW00200_00-EAGLERCRAFTPS400
 
-# Libraries linked into the ELF.
-# -lSceWebKit2 is a BEST-EFFORT guess at the stub lib name the OpenOrbis
-# lib generator would produce for include/orbis/WebKit2.h, following the
-# same "Sce" + header-basename convention as every other entry here
-# (Keyboard.h -> SceKeyboard, Pad.h -> ScePad, etc.) -- see README.
-LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceKeyboard \
-               -lSceSysmodule -lSceSystemService -lSceWebKit2 \
-               -lScePigletv2VSH
+# Libraries linked into the ELF. Confirmed against the real toolchain's
+# lib/*.so (no graphics/EGL/Piglet libs needed -- Common Dialog renders
+# its own overlay without the app providing a GL context, same as the
+# toolchain's own dialogs sample).
+LIBS        := -lc -lkernel -lc++ -lSceSysmodule -lSceCommonDialog -lSceWebBrowserDialog
 
 # Additional compile flags.
 EXTRAFLAGS  :=
@@ -31,7 +28,11 @@ EXTRAFLAGS  :=
 # Project source/asset layout (fixed names, unlike the sample convention of
 # PROJDIR == basename(CURDIR)).
 PROJDIR     := source
-ASSETS      := $(wildcard assets/**/*)
+# NOTE: $(wildcard assets/**/*) (the pattern every OpenOrbis sample Makefile
+# uses) does NOT recurse in GNU Make -- ** has no special meaning to
+# $(wildcard), so it silently matched nothing here and eaglercraft.html
+# was missing from the built pkg. Verified wrong, fixed with `find`.
+ASSETS      := $(shell find assets -type f 2>/dev/null)
 LIBMODULES  := $(wildcard sce_module/*)
 
 # Root vars
