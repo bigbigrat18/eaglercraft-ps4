@@ -17,10 +17,10 @@ TITLE_ID    := BREW00200
 CONTENT_ID  := IV0000-BREW00200_00-EAGLERCRAFTPS400
 
 # Libraries linked into the ELF. Confirmed against the real toolchain's
-# lib/*.so (no graphics/EGL/Piglet libs needed -- Common Dialog renders
-# its own overlay without the app providing a GL context, same as the
-# toolchain's own dialogs sample).
-LIBS        := -lc -lkernel -lc++ -lSceSysmodule -lSceCommonDialog -lSceWebBrowserDialog
+# lib/*.so. -lSceVideoOut is needed for the minimal Scene2D surface in
+# main.cpp (see its header comment for why a video-out handle is kept
+# open at all -- no EGL/Piglet GL context needed, just a plain framebuffer).
+LIBS        := -lc -lkernel -lc++ -lSceSysmodule -lSceCommonDialog -lSceWebBrowserDialog -lSceVideoOut
 
 # Additional compile flags.
 EXTRAFLAGS  :=
@@ -40,10 +40,15 @@ TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 COMMONDIR   := $(TOOLCHAIN)/samples/_common
 INTDIR      := x64/Debug
 
-# Define objects to build
+# Define objects to build. graphics.cpp is the toolchain's own Scene2D
+# helper (samples/_common/graphics.cpp) -- pulled in directly rather than
+# via the sample convention's COMMONFILES wildcard, since that wildcard
+# would also pull in png.cpp/ootk, which this project doesn't use or link
+# against.
 CFILES      := $(wildcard $(PROJDIR)/*.c)
 CPPFILES    := $(wildcard $(PROJDIR)/*.cpp)
-OBJS        := $(patsubst $(PROJDIR)/%.c, $(INTDIR)/%.o, $(CFILES)) $(patsubst $(PROJDIR)/%.cpp, $(INTDIR)/%.o, $(CPPFILES))
+COMMONFILES := $(COMMONDIR)/graphics.cpp
+OBJS        := $(patsubst $(PROJDIR)/%.c, $(INTDIR)/%.o, $(CFILES)) $(patsubst $(PROJDIR)/%.cpp, $(INTDIR)/%.o, $(CPPFILES)) $(patsubst $(COMMONDIR)/%.cpp, $(INTDIR)/%.o, $(COMMONFILES))
 
 # Define final C/C++ flags
 CFLAGS      := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables -c $(EXTRAFLAGS) -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include -I$(COMMONDIR)
@@ -98,6 +103,9 @@ $(INTDIR)/%.o: $(PROJDIR)/%.c
 	$(CC) $(CFLAGS) -o $@ $<
 
 $(INTDIR)/%.o: $(PROJDIR)/%.cpp
+	$(CCX) $(CXXFLAGS) -o $@ $<
+
+$(INTDIR)/%.o: $(COMMONDIR)/%.cpp
 	$(CCX) $(CXXFLAGS) -o $@ $<
 
 clean:

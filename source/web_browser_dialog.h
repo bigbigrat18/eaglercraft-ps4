@@ -73,6 +73,14 @@ extern "C" {
 	int32_t sceWebBrowserDialogGetResult(OrbisWebBrowserDialogResult* result);
 }
 
+enum class WebBrowserDialogInitResult
+{
+	OK,
+	MODULE_LOAD_FAILED,        // sceSysmoduleLoadModule
+	COMMON_DIALOG_INIT_FAILED, // sceCommonDialogInitialize
+	WEBBROWSER_INIT_FAILED,    // sceWebBrowserDialogInitialize
+};
+
 class WebBrowserDialog
 {
 	bool isOpen;
@@ -80,8 +88,11 @@ public:
 	WebBrowserDialog();
 
 	// Loads libSceWebBrowserDialog.sprx, then sceCommonDialogInitialize()
-	// + sceWebBrowserDialogInitialize(). Returns false on failure.
-	bool Init();
+	// + sceWebBrowserDialogInitialize(). Split into a 3-way result (rather
+	// than plain bool) specifically so a caller with no debug console can
+	// still tell which of the three calls failed, e.g. by showing a
+	// different screen color per case.
+	WebBrowserDialogInitResult Init();
 
 	// Opens the dialog pointed at a file:// URL built from a local
 	// pkg-relative path, e.g. "/app0/assets/eaglercraft.html". Real
