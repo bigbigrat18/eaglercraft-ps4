@@ -28,14 +28,22 @@
 // - The *argument types* for those symbols are NOT yet reverse-engineered
 //   anywhere in OpenOrbis -- WebBrowserDialog.h only ships bare,
 //   argument-less NID stubs (`void sceWebBrowserDialogOpen();`).
-//   OrbisWebBrowserDialogParam/Result below are reconstructed by following
-//   the exact same baseParam + size + userId + reserved[] shape every
-//   other real, confirmed Common Dialog in this toolchain uses
-//   (OrbisMsgDialogParam, used verbatim as the structural template). This
-//   is a well-grounded guess, not one invented from nothing -- but the
-//   extra `url` field and its offset could still be wrong. If
-//   sceWebBrowserDialogOpen() returns an error or crashes, this struct is
-//   the first thing to re-check/adjust.
+//   OrbisWebBrowserDialogParam below was originally modeled on
+//   OrbisMsgDialogParam's shape (baseParam + size + userId + reserved[]),
+//   which built but failed at runtime: sceWebBrowserDialogOpen() returned
+//   an error (confirmed via the screen-color diagnostics in main.cpp --
+//   see README "Status colors"). That first guess was also ~112 bytes,
+//   which turned out to be the clue: the AnyPS5 PS4/PS5 emulator
+//   project's test harness for sceWebBrowserDialogOpen
+//   (GuestWebBrowserDialog.cpp, github.com/boykopovar/AnyPS5) uses a
+//   plain 64-byte buffer and confirms the function null-checks its
+//   pointer arg (COMMON_DIALOG_ERROR_ARG_NULL on nullptr), without
+//   revealing field names. 48 (baseParam) + 8 (size) + 8 (one pointer)
+//   == 64 exactly, so the struct below drops the userId/reserved[] this
+//   dialog apparently doesn't have and keeps just baseParam + size + a
+//   single url pointer. Better-grounded than the first guess, but still
+//   not confirmed field-by-field -- if Open() still fails, this is the
+//   next thing to revisit.
 
 #include <orbis/CommonDialog.h>
 #include <orbis/_types/common_dialog.h>
@@ -43,17 +51,18 @@
 #include <stddef.h>
 
 extern "C" {
-	typedef int32_t OrbisUserServiceUserId;
-
-	// Best-effort reconstruction -- see confidence note above.
+	// Best-effort reconstruction -- see confidence note above. Exactly 64
+	// bytes: 48 (baseParam) + 8 (size) + 8 (url).
 	typedef struct OrbisWebBrowserDialogParam
 	{
 		OrbisCommonDialogBaseParam baseParam;
 		size_t size;
 		const char* url;
-		OrbisUserServiceUserId userId;
-		char reserved[40];
 	} OrbisWebBrowserDialogParam;
+
+	static_assert(sizeof(OrbisWebBrowserDialogParam) == 64,
+		"OrbisWebBrowserDialogParam must stay 64 bytes to match the size "
+		"confirmed in AnyPS5's sceWebBrowserDialogOpen test harness");
 
 	typedef struct OrbisWebBrowserDialogResult
 	{

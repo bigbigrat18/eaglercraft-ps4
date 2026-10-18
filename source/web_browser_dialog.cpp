@@ -48,7 +48,6 @@ bool WebBrowserDialog::OpenLocalFile(const char* app0RelativePath)
 
 	param.size = sizeof(param);
 	param.url = url.c_str();
-	param.userId = -1; // -1: whichever user is the initial/active one
 
 	if(sceWebBrowserDialogOpen(&param) < 0)
 	{
