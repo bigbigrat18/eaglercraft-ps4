@@ -20,10 +20,19 @@ CONTENT_ID  := IV0000-BREW00200_00-EAGLERCRAFTPS400
 # lib/*.so. -lSceVideoOut is needed for the minimal Scene2D surface in
 # main.cpp (see its header comment for why a video-out handle is kept
 # open at all -- no EGL/Piglet GL context needed, just a plain framebuffer).
-LIBS        := -lc -lkernel -lc++ -lSceSysmodule -lSceCommonDialog -lSceWebBrowserDialog -lSceVideoOut
+# -lSceFreeType backs Scene2D's text drawing (GRAPHICS_USES_FONT below),
+# used to show exact error codes on screen for debugging -- far more
+# reliable than a hardware tester trying to decode color bars from a
+# photo, which is what this replaced.
+LIBS        := -lc -lkernel -lc++ -lSceSysmodule -lSceCommonDialog -lSceWebBrowserDialog -lSceVideoOut -lSceFreeType
 
-# Additional compile flags.
-EXTRAFLAGS  :=
+# Additional compile flags. GRAPHICS_USES_FONT enables Scene2D's
+# FreeType-backed DrawText (see samples/keyboard's own Makefile for the
+# same flag, verified pattern). NOTE: Make doesn't notice when a flag
+# like this one changes, only when source files do -- `make clean` first
+# if you flip this and see undefined-symbol link errors for
+# Scene2D::InitFont/DrawText.
+EXTRAFLAGS  := -DGRAPHICS_USES_FONT
 
 # Project source/asset layout (fixed names, unlike the sample convention of
 # PROJDIR == basename(CURDIR)).
