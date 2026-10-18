@@ -16,6 +16,10 @@
 //     hardware, so the screen's solid color doubles as the only
 //     diagnostic signal available if something fails early. See the
 //     COLOR_* constants below and the README's "Status colors" section.
+//     On an Open() failure specifically, the screen instead shows 8
+//     colored bars encoding the actual sceWebBrowserDialogOpen() return
+//     code in hex (see DrawHexCode below) -- a flat color can only tell
+//     us *that* it failed, not *why*.
 
 #include <iostream>
 #include <sstream>
@@ -36,11 +40,45 @@ namespace
 
 	// Status colors -- see README "Status colors" for what each one means.
 	const Color COLOR_BOOTING     = {64, 64, 64};
-	const Color COLOR_NO_VIDEO    = {255, 255, 0};
 	const Color COLOR_MODULE_FAIL = {255, 0, 0};
 	const Color COLOR_INIT_FAIL   = {255, 140, 0};
-	const Color COLOR_OPEN_FAIL   = {200, 0, 200};
 	const Color COLOR_RUNNING     = {0, 200, 0};
+
+	// 16-entry palette for the hex-code bar display, chosen for maximum
+	// visual distinctness in a phone photo of a TV screen -- see README
+	// "Reading the hex-code bars" for the same table.
+	const Color HEX_PALETTE[16] = {
+		{0, 0, 0},       // 0 black
+		{255, 255, 255}, // 1 white
+		{255, 0, 0},     // 2 red
+		{0, 255, 0},     // 3 green
+		{0, 0, 255},     // 4 blue
+		{255, 255, 0},   // 5 yellow
+		{0, 255, 255},   // 6 cyan
+		{255, 0, 255},   // 7 magenta
+		{255, 140, 0},   // 8 orange
+		{160, 0, 255},   // 9 purple
+		{139, 69, 19},   // A brown
+		{160, 160, 160}, // B gray
+		{128, 0, 0},     // C maroon
+		{0, 0, 128},     // D navy
+		{128, 128, 0},   // E olive
+		{0, 128, 128},   // F teal
+	};
+
+	// Draws `value`'s 8 hex nibbles (most significant first) as 8 equal
+	// vertical bars across the full screen, one solid frame (no flipping
+	// loop needed -- the caller re-presents it like any other status).
+	void DrawHexCode(Scene2D* scene, uint32_t value)
+	{
+		int barWidth = SCREEN_WIDTH / 8;
+		for(int i = 0; i < 8; i++)
+		{
+			int shift = (7 - i) * 4;
+			int nibble = (value >> shift) & 0xF;
+			scene->DrawRectangle(i * barWidth, 0, barWidth, SCREEN_HEIGHT, HEX_PALETTE[nibble]);
+		}
+	}
 }
 
 int main(void)
@@ -58,16 +96,22 @@ int main(void)
 	bool hasVideo = scene->Init(0xC000000, 2);
 	int frameID = 0;
 	Color statusColor = COLOR_BOOTING;
+	bool showingHexCode = false;
+	uint32_t hexCodeValue = 0;
 
-	// Keeps presenting a solid status color every frame. If hasVideo is
-	// false this is a no-op (nothing we can do without a video-out
-	// handle), which itself would mean the screen stays black/whatever
-	// the system left it at -- a distinct failure mode worth knowing too.
+	// Keeps presenting either a solid status color or the hex-code bars
+	// every frame. If hasVideo is false this is a no-op (nothing we can
+	// do without a video-out handle), which itself would mean the screen
+	// stays black/whatever the system left it at -- a distinct failure
+	// mode worth knowing too.
 	auto presentStatus = [&]()
 	{
 		if(!hasVideo)
 			return;
-		scene->FrameBufferFill(statusColor);
+		if(showingHexCode)
+			DrawHexCode(scene, hexCodeValue);
+		else
+			scene->FrameBufferFill(statusColor);
 		scene->SubmitFlip(frameID);
 		scene->FrameWait(frameID);
 		scene->FrameBufferSwap();
@@ -101,12 +145,13 @@ int main(void)
 			presentStatus();
 	}
 
-	if(!dialog.OpenLocalFile(kAssetPath))
+	int32_t openResult = dialog.OpenLocalFile(kAssetPath);
+	if(openResult < 0)
 	{
-		std::cerr << "Fatal: WebBrowserDialog open failed -- see "
-			"source/web_browser_dialog.h confidence notes, the param "
-			"struct layout is the most likely culprit." << std::endl;
-		statusColor = COLOR_OPEN_FAIL;
+		std::cerr << "Fatal: WebBrowserDialog open failed, rc=0x"
+			<< std::hex << openResult << std::endl;
+		showingHexCode = true;
+		hexCodeValue = static_cast<uint32_t>(openResult);
 		for(;;)
 			presentStatus();
 	}
@@ -121,10 +166,13 @@ int main(void)
 		{
 			// The dialog is the entire "game" -- if it got dismissed,
 			// just reopen it rather than leaving a blank screen.
-			if(!dialog.OpenLocalFile(kAssetPath))
+			int32_t reopenResult = dialog.OpenLocalFile(kAssetPath);
+			if(reopenResult < 0)
 			{
-				std::cerr << "Fatal: failed to reopen WebBrowserDialog." << std::endl;
-				statusColor = COLOR_OPEN_FAIL;
+				std::cerr << "Fatal: failed to reopen WebBrowserDialog, rc=0x"
+					<< std::hex << reopenResult << std::endl;
+				showingHexCode = true;
+				hexCodeValue = static_cast<uint32_t>(reopenResult);
 				for(;;)
 					presentStatus();
 			}
